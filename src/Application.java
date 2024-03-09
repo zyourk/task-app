@@ -1,5 +1,7 @@
 import java.sql.SQLException;
 import java.sql.SQLIntegrityConstraintViolationException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -12,7 +14,7 @@ public class Application {
   // Instance variables for the application to keep track of
   // the user using the application and to have something to access the DB
   private String currentUserID;
-  private DBUpdater dbUpdater = new DBUpdater();
+  private final DBUpdater dbUpdater = new DBUpdater();
 
   /**
    * By beginning the application, the connection to the database is established
@@ -56,6 +58,78 @@ public class Application {
     }
     return true;
   }
+
+  public boolean validateTaskInfo(String taskTitle, String taskDesc, String deadline, int priority, String status)
+  {
+    if(taskTitle.length() == 0 || taskTitle.length() > 20)
+    {
+      return false;
+    }
+    if(taskDesc.length() > 200)
+    {
+      return false;
+    }
+    if(deadline.length() != 5 || deadline.charAt(2) != '/' || !verifyDate(deadline))
+    {
+      return false;
+    }
+    if(priority < 0 || priority > 1)
+    {
+      return false;
+    }
+    if(!(status.equalsIgnoreCase("pending")) && !(status.equalsIgnoreCase("completed")))
+    {
+      return false;
+    }
+    return true;
+  }
+
+  public boolean verifyDate(String deadline)
+  {
+    List<Integer> thirtyDayMonths = new ArrayList<>();
+    thirtyDayMonths.add(4);
+    thirtyDayMonths.add(6);
+    thirtyDayMonths.add(9);
+    thirtyDayMonths.add(11);
+    int month = Integer.parseInt(deadline.substring(0, 2));
+    int day = Integer.parseInt(deadline.substring(3));
+    if(month < 1 || month > 12)
+    {
+      return false;
+    }
+    if(day < 1)
+    {
+      return false;
+    }
+    if(month == 2 && day > 29)
+    {
+      return false;
+    }
+    if(thirtyDayMonths.contains(month) && day > 30)
+    {
+      return false;
+    }
+    if(day > 31)
+    {
+      return false;
+    }
+    return true;
+  }
+
+  public String reformatDate(String date)
+  {
+    String[] dateParts = date.split("/");
+    if(dateParts[0].length() == 1)
+    {
+      dateParts[0] = "0" + dateParts[0];
+    }
+    if(dateParts[1].length() == 1)
+    {
+      dateParts[1] = "0" + dateParts[1];
+    }
+    return dateParts[0] + "/" + dateParts[1];
+  }
+
 
   /**
    * checks the credentials a user attempts to log in with
@@ -102,8 +176,7 @@ public class Application {
       userID = userID.substring(28);
       try
       {
-        boolean added = dbUpdater.addUserToDB(userID, username, email, password);
-        return added;
+        return dbUpdater.addUserToDB(userID, username, email, password);
       }
       catch (SQLIntegrityConstraintViolationException e)
       {
@@ -125,8 +198,8 @@ public class Application {
   {
     if(password.equals(dbUpdater.findPasswordFromID(currentUserID)))
     {
-      dbUpdater.removeUserFromDB(currentUserID);
-      return true;
+      return dbUpdater.removeUserFromDB(currentUserID);
+
     }
     System.out.println("There was an error deleting your account");
     return false;
@@ -162,4 +235,169 @@ public class Application {
     }
   }
 
+  /**
+   * removes a category from DB
+   * @param categoryTitle name of category
+   * @return true if successful
+   */
+  public boolean removeCategory(String categoryTitle)
+  {
+    String categoryID;
+    try
+    {
+      categoryID = dbUpdater.findCategoryID(categoryTitle, currentUserID);
+    }
+    catch (DoesNotExistException e)
+    {
+      System.out.println("Category nonexistent");
+      return false;
+    }
+    if(dbUpdater.removeCategoryFromDB(categoryID))
+    {
+      System.out.println("Category deleted successfully");
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * adds task to DB
+   * @param taskTitle name of task
+   * @param taskDesc description
+   * @param deadline deadline of task
+   * @param priority 0 or 1 (unimportant or important)
+   * @param status pending or completed
+   * @return true if successful
+   */
+  public boolean addTask(String taskTitle, String taskDesc, String deadline, int priority, String status)
+  {
+    deadline = reformatDate(deadline);
+    if(validateTaskInfo(taskTitle, taskDesc, deadline, priority, status))
+    {
+      UUID uniqueTaskID = UUID.randomUUID();
+      String taskID = uniqueTaskID.toString();
+      taskID = taskID.substring(28);
+      if(dbUpdater.addTaskToDB(taskID, taskTitle, taskDesc, deadline, priority, status, currentUserID))
+      {
+        System.out.println("Task added successfully");
+        return true;
+      }
+      System.out.println("Could not add task to database");
+      return false;
+    }
+    System.out.println("Task info invalid");
+    return false;
+  }
+
+  /**
+   * removes a task from DB
+   * @param taskTitle given task
+   * @return true if successful
+   */
+  public boolean removeTask(String taskTitle)
+  {
+    String taskID;
+    try
+    {
+      taskID = dbUpdater.findTaskID(taskTitle, currentUserID);
+    }
+    catch (DoesNotExistException e)
+    {
+      System.out.println("Task nonexistent");
+      return false;
+    }
+    if(dbUpdater.removeTaskFromDB(taskID))
+    {
+      System.out.println("Task deleted successfully");
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * adds a task to a category
+   * @param categoryTitle given category
+   * @param taskTitle given task
+   * @return true if successful
+   */
+  public boolean addTaskToCategory(String categoryTitle, String taskTitle)
+  {
+    String taskID;
+    String categoryID;
+    try
+    {
+      taskID = dbUpdater.findTaskID(taskTitle, currentUserID);
+      categoryID = dbUpdater.findCategoryID(categoryTitle, currentUserID);
+    }
+    catch(DoesNotExistException e)
+    {
+      System.out.println("Task or category does not exist");
+      return false;
+    }
+    if(dbUpdater.addTaskToCategory(taskID, categoryID))
+    {
+      System.out.println("Task added to category");
+      return true;
+    }
+    else
+    {
+      System.out.println("Error adding task to category");
+      return false;
+    }
+  }
+
+  /**
+   * removes a task from its category
+   * @param taskTitle given task
+   * @return true if process successful
+   */
+  public boolean decategorizeTask(String taskTitle)
+  {
+    String taskID;
+    try
+    {
+      taskID = dbUpdater.findTaskID(taskTitle, currentUserID);
+    }
+    catch(DoesNotExistException e)
+    {
+      System.out.println("Task does not exist");
+      return false;
+    }
+    if(dbUpdater.removeTaskCategory(taskID))
+    {
+      System.out.println("Task decategorized successfully");
+      return true;
+    }
+    else
+    {
+      System.out.println("Error decategorizing task");
+      return false;
+    }
+  }
+
+  /**
+   * displays all tasks in a given category
+   * @param categoryTitle the given category
+   * @return true if process successful
+   */
+  public boolean displayTasksInCat(String categoryTitle)
+  {
+    String categoryID;
+    System.out.println("Tasks in category " + categoryTitle + ":");
+    try
+    {
+      categoryID = dbUpdater.findCategoryID(categoryTitle, currentUserID);
+    }
+    catch(DoesNotExistException e)
+    {
+      System.out.println("Category does not exist");
+      return false;
+    }
+    String[] taskTitles = dbUpdater.findTasksInCategory(categoryID);
+    for (String taskTitle : taskTitles)
+    {
+      System.out.println(taskTitle);
+    }
+    return true;
+  }
 }

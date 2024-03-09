@@ -13,9 +13,9 @@ public class DBUpdater
    * Information hidden
    */
   Hidden info = new Hidden();
-  private String user = info.getUser();
-  private String pass = info.getPass();
-  private String url = info.getUrl();
+  private final String user = info.getUser();
+  private final String pass = info.getPass();
+  private final String url = info.getUrl();
   protected Connection dbConnection;
 
   /**
@@ -246,6 +246,58 @@ public class DBUpdater
   }
 
   /**
+   * removes a task from the DB
+   * @param taskID ID of task to remove
+   * @return true if successful
+   */
+  public boolean removeTaskFromDB(String taskID)
+  {
+    String removeTask = "delete from task where taskid = ?";
+    try
+    {
+      PreparedStatement preparedRemoveTask = dbConnection.prepareStatement(removeTask);
+      preparedRemoveTask.setString(1, taskID);
+      int rowsRemoved = preparedRemoveTask.executeUpdate();
+      if (rowsRemoved == 1) {
+        System.out.println("removed");
+        return true;
+      }
+    }
+    catch(SQLException e)
+    {
+      e.printStackTrace();
+      //Shouldn't occur
+    }
+    return false;
+  }
+
+  /**
+   * removes a category from the DB
+   * @param categoryID ID of category to remove
+   * @return true if successful
+   */
+  public boolean removeCategoryFromDB(String categoryID)
+  {
+    String removeCategory = "delete from category where categoryid = ?";
+    try
+    {
+      PreparedStatement preparedRemoveCategory = dbConnection.prepareStatement(removeCategory);
+      preparedRemoveCategory.setString(1, categoryID);
+      int rowsRemoved = preparedRemoveCategory.executeUpdate();
+      if (rowsRemoved == 1) {
+        System.out.println("removed");
+        return true;
+      }
+    }
+    catch(SQLException e)
+    {
+      e.printStackTrace();
+      //Shouldn't occur
+    }
+    return false;
+  }
+
+  /**
    * Used to add a category to the DB
    * @param categoryID UUID generated ID
    * @param madeByUserID ID of user who made the category
@@ -256,7 +308,6 @@ public class DBUpdater
   {
     String addCategory = "insert into category (categoryid, madebyuserid, categorytitle) values (?, ?, ?);";
     try {
-
       PreparedStatement preparedAddCategory = dbConnection.prepareStatement(addCategory);
       preparedAddCategory.setString(1, categoryID);
       preparedAddCategory.setString(2, madeByUserID);
@@ -272,6 +323,145 @@ public class DBUpdater
     {
       throw new RuntimeException(e);
     }
+  }
+
+  /**
+   * finds category ID
+   * @param categoryTitle name of category to locate
+   * @param userID current user
+   * @return the ID of category
+   * @throws DoesNotExistException if no category with name
+   */
+  public String findCategoryID(String categoryTitle, String userID) throws DoesNotExistException
+  {
+    String foundCategoryID;
+    String findCategory = "select * from category where (categorytitle = ? and madebyuserid = ?);";
+    try
+    {
+      PreparedStatement preparedFindCategory = dbConnection.prepareStatement(findCategory);
+      preparedFindCategory.setString(1, categoryTitle);
+      preparedFindCategory.setString(2, userID);
+      ResultSet rs = preparedFindCategory.executeQuery();
+      rs.next();
+      foundCategoryID = rs.getString("categoryid");
+    }
+    catch (SQLException e)
+    {
+      throw new DoesNotExistException("Category does not exist");
+    }
+    return foundCategoryID;
+  }
+
+  /**
+   * finds ID of task
+   * @param taskTitle title of task to find
+   * @param userID current user
+   * @return ID of task
+   * @throws DoesNotExistException if task doesn't exist
+   */
+  public String findTaskID(String taskTitle, String userID) throws DoesNotExistException
+  {
+    String foundTaskID;
+    String findCategory = "select * from task where (taskTitle = ? and taskuserid = ?);";
+    try
+    {
+      PreparedStatement preparedFindCategory = dbConnection.prepareStatement(findCategory);
+      preparedFindCategory.setString(1, taskTitle);
+      preparedFindCategory.setString(2, userID);
+      ResultSet rs = preparedFindCategory.executeQuery();
+      rs.next();
+      foundTaskID = rs.getString("taskid");
+    }
+    catch (SQLException e)
+    {
+      throw new DoesNotExistException("Task does not exist");
+    }
+    return foundTaskID;
+  }
+
+  /**
+   * adds a task to a certain category
+   * @param taskID ID of given task
+   * @param categoryID ID of given category
+   * @return true if successful
+   */
+  public boolean addTaskToCategory(String taskID, String categoryID)
+  {
+    String updateTask = "update task set taskcategoryid = ? where taskid = ?";
+    try
+    {
+      PreparedStatement prepareUpdateTask = dbConnection.prepareStatement(updateTask);
+      prepareUpdateTask.setString(1, categoryID);
+      prepareUpdateTask.setString(2, taskID);
+      int rowsChanged = prepareUpdateTask.executeUpdate();
+      if (rowsChanged == 1) {
+        System.out.println("Task categorized");
+        return true;
+      }
+    }
+    catch (SQLException e)
+    {
+      throw new RuntimeException();
+    }
+    return false;
+  }
+
+  /**
+   * removes a task from a category
+   * @param taskID task to remove
+   * @return true if successful
+   */
+  public boolean removeTaskCategory(String taskID)
+  {
+    String updateTask = "update task set taskcategoryid = NULL where taskid = ?";
+    try
+    {
+      PreparedStatement prepareUpdateTask = dbConnection.prepareStatement(updateTask);
+      prepareUpdateTask.setString(1, taskID);
+      int rowsChanged = prepareUpdateTask.executeUpdate();
+      if (rowsChanged == 1) {
+        System.out.println("Task decategorized");
+        return true;
+      }
+    }
+    catch (SQLException e)
+    {
+      throw new RuntimeException();
+    }
+    return false;
+  }
+
+  /**
+   * finds all tasks in a certain category
+   * @param categoryID ID of that category
+   * @return names of tasks in that category
+   */
+  public String[] findTasksInCategory(String categoryID)
+  {
+    String[] taskNames;
+    String findTaskGroup = "select * from task where taskcategoryid = ?";
+    String findSetSize = "select count(*) from task where taskcategoryid = ?";
+    try
+    {
+      PreparedStatement preparedFindTaskGroup = dbConnection.prepareStatement(findTaskGroup);
+      preparedFindTaskGroup.setString(1, categoryID);
+      PreparedStatement preparedFindSize = dbConnection.prepareStatement(findSetSize);
+      preparedFindSize.setString(1, categoryID);
+      ResultSet tasks = preparedFindTaskGroup.executeQuery();
+      ResultSet count = preparedFindSize.executeQuery();
+      count.next();
+      int size = count.getInt(1);
+      taskNames = new String[size];
+      for (int i = 0; i < size; i++) {
+        tasks.next();
+        taskNames[i] = tasks.getString("taskTitle");
+      }
+    }
+    catch(SQLException e)
+    {
+      throw new RuntimeException();
+    }
+    return taskNames;
   }
 
 }
