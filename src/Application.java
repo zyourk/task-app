@@ -2,7 +2,11 @@ import java.sql.SQLException;
 import java.sql.SQLIntegrityConstraintViolationException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import java.util.UUID;
+import javax.mail.*;
+import javax.mail.internet.*;
+import javax.mail.internet.MimeMessage;
 
 /**
  * Application level of the program.
@@ -15,6 +19,7 @@ public class Application {
   // the user using the application and to have something to access the DB
   private String currentUserID;
   private final DBUpdater dbUpdater = new DBUpdater();
+  Hidden info = new Hidden();
 
   /**
    * By beginning the application, the connection to the database is established
@@ -33,6 +38,11 @@ public class Application {
   public void end()
   {
     dbUpdater.close();
+  }
+
+  public String getCurrentUserID()
+  {
+    return currentUserID;
   }
 
   /**
@@ -59,7 +69,15 @@ public class Application {
     return true;
   }
 
-  public boolean validateTaskInfo(String taskTitle, String taskDesc, String deadline, int priority, String status)
+  /**
+   * Ensures that inputted task info fits standards
+   * @param taskTitle task title
+   * @param taskDesc task description
+   * @param deadline task deadline
+   * @param priority task priority
+   * @return true if valid
+   */
+  public boolean validateTaskInfo(String taskTitle, String taskDesc, String deadline, int priority)
   {
     if(taskTitle.length() == 0 || taskTitle.length() > 20)
     {
@@ -77,13 +95,14 @@ public class Application {
     {
       return false;
     }
-    if(!(status.equalsIgnoreCase("pending")) && !(status.equalsIgnoreCase("completed")))
-    {
-      return false;
-    }
     return true;
   }
 
+  /**
+   * verifies a date for a deadline
+   * @param deadline task deadline
+   * @return true if valid
+   */
   public boolean verifyDate(String deadline)
   {
     List<Integer> thirtyDayMonths = new ArrayList<>();
@@ -116,6 +135,12 @@ public class Application {
     return true;
   }
 
+  /**
+   * reformats a date so that it is 5 characters in case it is only 3 o4
+   * ex. 3/19 or 3/9
+   * @param date date to reformat
+   * @return reformatted date
+   */
   public String reformatDate(String date)
   {
     String[] dateParts = date.split("/");
@@ -237,21 +262,11 @@ public class Application {
 
   /**
    * removes a category from DB
-   * @param categoryTitle name of category
+   * @param categoryID ID of category
    * @return true if successful
    */
-  public boolean removeCategory(String categoryTitle)
+  public boolean removeCategory(String categoryID)
   {
-    String categoryID;
-    try
-    {
-      categoryID = dbUpdater.findCategoryID(categoryTitle, currentUserID);
-    }
-    catch (DoesNotExistException e)
-    {
-      System.out.println("Category nonexistent");
-      return false;
-    }
     if(dbUpdater.removeCategoryFromDB(categoryID))
     {
       System.out.println("Category deleted successfully");
@@ -266,20 +281,23 @@ public class Application {
    * @param taskDesc description
    * @param deadline deadline of task
    * @param priority 0 or 1 (unimportant or important)
-   * @param status pending or completed
    * @return true if successful
    */
-  public boolean addTask(String taskTitle, String taskDesc, String deadline, int priority, String status)
+  public boolean addTask(String taskTitle, String taskDesc, String deadline, int priority)
   {
     deadline = reformatDate(deadline);
-    if(validateTaskInfo(taskTitle, taskDesc, deadline, priority, status))
+    if(validateTaskInfo(taskTitle, taskDesc, deadline, priority))
     {
       UUID uniqueTaskID = UUID.randomUUID();
       String taskID = uniqueTaskID.toString();
       taskID = taskID.substring(28);
-      if(dbUpdater.addTaskToDB(taskID, taskTitle, taskDesc, deadline, priority, status, currentUserID))
+      if(dbUpdater.addTaskToDB(taskID, taskTitle, taskDesc, deadline, priority, currentUserID))
       {
         System.out.println("Task added successfully");
+        if(priority == 1)
+        {
+          mailUser(taskTitle, taskDesc, deadline);
+        }
         return true;
       }
       System.out.println("Could not add task to database");
@@ -291,42 +309,31 @@ public class Application {
 
   /**
    * removes a task from DB
-   * @param taskTitle given task
+   * @param taskID given task
    * @return true if successful
    */
-  public boolean removeTask(String taskTitle)
+  public boolean removeTask(String taskID)
   {
-    String taskID;
-    try
-    {
-      taskID = dbUpdater.findTaskID(taskTitle, currentUserID);
-    }
-    catch (DoesNotExistException e)
-    {
-      System.out.println("Task nonexistent");
-      return false;
-    }
     if(dbUpdater.removeTaskFromDB(taskID))
     {
       System.out.println("Task deleted successfully");
       return true;
     }
+    System.out.println("Could not find record of task");
     return false;
   }
 
   /**
    * adds a task to a category
    * @param categoryTitle given category
-   * @param taskTitle given task
+   * @param taskID given task
    * @return true if successful
    */
-  public boolean addTaskToCategory(String categoryTitle, String taskTitle)
+  public boolean addTaskToCategory(String categoryTitle, String taskID)
   {
-    String taskID;
     String categoryID;
     try
     {
-      taskID = dbUpdater.findTaskID(taskTitle, currentUserID);
       categoryID = dbUpdater.findCategoryID(categoryTitle, currentUserID);
     }
     catch(DoesNotExistException e)
@@ -348,21 +355,11 @@ public class Application {
 
   /**
    * removes a task from its category
-   * @param taskTitle given task
+   * @param taskID given task
    * @return true if process successful
    */
-  public boolean decategorizeTask(String taskTitle)
+  public boolean decategorizeTask(String taskID)
   {
-    String taskID;
-    try
-    {
-      taskID = dbUpdater.findTaskID(taskTitle, currentUserID);
-    }
-    catch(DoesNotExistException e)
-    {
-      System.out.println("Task does not exist");
-      return false;
-    }
     if(dbUpdater.removeTaskCategory(taskID))
     {
       System.out.println("Task decategorized successfully");
@@ -399,5 +396,91 @@ public class Application {
       System.out.println(taskTitle);
     }
     return true;
+  }
+
+  /**
+   * sends an email to the user when registering a high priority task
+   * @param taskTitle title of task
+   * @param taskDesc task description
+   * @param deadline deadline for task
+   */
+  public void mailUser(String taskTitle, String taskDesc, String deadline)
+  {
+    Properties props = new Properties();
+    props.put("mail.smtp.auth", "true");
+    props.put("mail.smtp.starttls.enable", "true");
+    props.put("mail.smtp.host", "smtp.gmail.com");
+    props.put("mail.smtp.port", "587");
+    String userEmail = dbUpdater.findEmailFromID(currentUserID);
+    String hA = info.getHa();
+    String hP = info.getHp();
+    Session session = Session.getInstance(props, new Authenticator() {
+      @Override
+      protected PasswordAuthentication getPasswordAuthentication() {
+        return new PasswordAuthentication(hA, hP);
+      }
+    });
+    try
+    {
+      Message message = new MimeMessage(session);
+      message.setFrom(new InternetAddress(hA));
+      message.addRecipient(Message.RecipientType.TO, new InternetAddress(userEmail));
+      message.setSubject("New High Priority Task!");
+      message.setText("Thank you for using my task organizer!\n\n" +
+              "You registered task:  " + taskTitle + ", with description: " + taskDesc + ". Due " + deadline);
+      Transport.send(message);
+      System.out.println("Email sent!");
+    }
+    catch(MessagingException e)
+    {
+      e.printStackTrace();
+    }
+  }
+
+  /**
+   * used to update the text area in GUI
+   * @return list of tasks for current user
+   */
+  public ArrayList<String> returnUserTasks()
+  {
+    return dbUpdater.findTasksForUser(currentUserID);
+  }
+
+  /**
+   * sorts tasks for text area in GUI
+   * @return sorted list of tasks for user
+   */
+  public ArrayList<String> returnCatSortedTasks()
+  {
+    return dbUpdater.findTasksForUserSortByCat(currentUserID);
+  }
+
+  /**
+   * sorts tasks by deadline for GUI
+   * @return deadline sorted list of tasks
+   */
+  public ArrayList<String> returnDeadlineSortedTasks()
+  {
+    return dbUpdater.findTasksForUserSortByDL(currentUserID);
+  }
+
+  /**
+   * used to remove text from GUI dropdown
+   * @param categoryID id of category
+   * @return title of category given ID
+   * @throws DoesNotExistException if category does not exist
+   */
+  public String returnCategoryTitle(String categoryID) throws DoesNotExistException
+  {
+    return dbUpdater.findCategoryTitle(categoryID);
+  }
+
+  /**
+   * returns list of user created categories
+   * @return list of user created categories
+   */
+  public ArrayList<String> returnUserCategories()
+  {
+    return dbUpdater.findCategoriesForUser(currentUserID);
   }
 }

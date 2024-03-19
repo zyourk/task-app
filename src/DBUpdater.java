@@ -1,4 +1,5 @@
 import java.sql.*;
+import java.util.ArrayList;
 
 /**
  * Database access point for the program
@@ -158,6 +159,31 @@ public class DBUpdater
   }
 
   /**
+   * finds a user's ID given their email, used to
+   * email user
+   * @param userID ID of user to email
+   * @return user's email address
+   */
+  public String findEmailFromID(String userID)
+  {
+    String foundID;
+    String findID = "select * from user where userid = ?";
+    try
+    {
+      PreparedStatement preparedFindID = dbConnection.prepareStatement(findID);
+      preparedFindID.setString(1, userID);
+      ResultSet user = preparedFindID.executeQuery();
+      user.next();
+      foundID = user.getString("email");
+      return foundID;
+    }
+    catch(SQLException e)
+    {
+      throw new RuntimeException();
+    }
+  }
+
+  /**
    * used when user deleting account to ensure it is
    * them deleting the account
    * @param userID currently logged in userID
@@ -213,15 +239,14 @@ public class DBUpdater
    * @param taskDesc brief description of task
    * @param deadline deadline for task, formatted (xx/xx)
    * @param priority priority, 1 for low 2 for high
-   * @param status status of task (completed, in progress)
    * @param taskUserID ID of user who made task
    * @return true if successfully added
    */
   public boolean addTaskToDB(String taskID, String taskTitle, String taskDesc, String deadline,
-                             int priority, String status, String taskUserID)
+                             int priority, String taskUserID)
   {
-    String addTask = "insert into task (taskid, tasktitle, taskdesc, deadline, priority, status, " +
-            "taskuserid) values (?, ?, ?, ?, ?, ?, ?)";
+    String addTask = "insert into task (taskid, tasktitle, taskdesc, deadline, priority, " +
+            "taskuserid) values (?, ?, ?, ?, ?, ?)";
     try
     {
       PreparedStatement preparedAddTask = dbConnection.prepareStatement(addTask);
@@ -230,8 +255,7 @@ public class DBUpdater
       preparedAddTask.setString(3, taskDesc);
       preparedAddTask.setString(4, deadline);
       preparedAddTask.setInt(5, priority);
-      preparedAddTask.setString(6, status);
-      preparedAddTask.setString(7, taskUserID);
+      preparedAddTask.setString(6, taskUserID);
       int rowsAdded = preparedAddTask.executeUpdate();
       if (rowsAdded == 1) {
         System.out.println("Added");
@@ -301,7 +325,7 @@ public class DBUpdater
    * Used to add a category to the DB
    * @param categoryID UUID generated ID
    * @param madeByUserID ID of user who made the category
-   * @param categoryTitle tilte of category
+   * @param categoryTitle title of category
    * @return true if successfully added
    */
   public boolean addCategoryToDB(String categoryID, String madeByUserID, String categoryTitle)
@@ -352,32 +376,6 @@ public class DBUpdater
     return foundCategoryID;
   }
 
-  /**
-   * finds ID of task
-   * @param taskTitle title of task to find
-   * @param userID current user
-   * @return ID of task
-   * @throws DoesNotExistException if task doesn't exist
-   */
-  public String findTaskID(String taskTitle, String userID) throws DoesNotExistException
-  {
-    String foundTaskID;
-    String findCategory = "select * from task where (taskTitle = ? and taskuserid = ?);";
-    try
-    {
-      PreparedStatement preparedFindCategory = dbConnection.prepareStatement(findCategory);
-      preparedFindCategory.setString(1, taskTitle);
-      preparedFindCategory.setString(2, userID);
-      ResultSet rs = preparedFindCategory.executeQuery();
-      rs.next();
-      foundTaskID = rs.getString("taskid");
-    }
-    catch (SQLException e)
-    {
-      throw new DoesNotExistException("Task does not exist");
-    }
-    return foundTaskID;
-  }
 
   /**
    * adds a task to a certain category
@@ -462,6 +460,206 @@ public class DBUpdater
       throw new RuntimeException();
     }
     return taskNames;
+  }
+
+  /**
+   * finds all tasks for a given user
+   * @param userID ID of user to find tasks for
+   * @return list of user tasks
+   */
+  public ArrayList<String> findTasksForUser(String userID)
+  {
+    ArrayList<String> returnTasks = new ArrayList<>();
+    String findTasks = "select * from task where taskuserid = ?";
+    try
+    {
+      PreparedStatement preparedFindTasks = dbConnection.prepareStatement(findTasks);
+      preparedFindTasks.setString(1, userID);
+      ResultSet tasks = preparedFindTasks.executeQuery();
+      while (tasks.next()) {
+        String taskID = tasks.getString("taskid");
+        String taskTitle = tasks.getString("tasktitle");
+        String categoryID = tasks.getString("taskcategoryid");
+        String category;
+        if(!(categoryID == null))
+        {
+          category = findCategoryTitle(tasks.getString("taskcategoryid"));
+        }
+        else
+        {
+          categoryID = "null";
+          category = "uncategorized";
+        }
+        String deadline = tasks.getString("deadline");
+        String priority = tasks.getString("priority");
+        returnTasks.add(formatData(taskID, taskTitle, category, categoryID, deadline));
+      }
+    }
+    catch(SQLException e)
+    {
+      throw new RuntimeException();
+    }
+    return returnTasks;
+  }
+
+  /**
+   * finds all tasks for user sorted by category
+   * @param userID ID of user
+   * @return list of sorted tasks
+   */
+  public ArrayList<String> findTasksForUserSortByCat(String userID)
+  {
+    ArrayList<String> returnTasks = new ArrayList<>();
+    String findTasks = "select * from task where taskuserid = ? order by taskcategoryid";
+    try
+    {
+      PreparedStatement preparedFindTasks = dbConnection.prepareStatement(findTasks);
+      preparedFindTasks.setString(1, userID);
+      ResultSet tasks = preparedFindTasks.executeQuery();
+      while (tasks.next()) {
+        String taskID = tasks.getString("taskid");
+        String taskTitle = tasks.getString("tasktitle");
+        String categoryID = tasks.getString("taskcategoryid");
+        String category;
+        if(!(categoryID == null))
+        {
+          category = findCategoryTitle(tasks.getString("taskcategoryid"));
+        }
+        else
+        {
+          categoryID = "null";
+          category = "uncategorized";
+        }
+        String deadline = tasks.getString("deadline");
+        String priority = tasks.getString("priority");
+        returnTasks.add(formatData(taskID, taskTitle, category, categoryID, deadline));
+      }
+    }
+    catch(SQLException e)
+    {
+      throw new RuntimeException();
+    }
+    return returnTasks;
+  }
+
+  /**
+   * finds all tasks for user sorted by deadline
+   * @param userID ID of user
+   * @return list of sorted tasks
+   */
+  public ArrayList<String> findTasksForUserSortByDL(String userID)
+  {
+    ArrayList<String> returnTasks = new ArrayList<>();
+    String findTasks = "select * from task where taskuserid = ? order by deadline";
+    try
+    {
+      PreparedStatement preparedFindTasks = dbConnection.prepareStatement(findTasks);
+      preparedFindTasks.setString(1, userID);
+      ResultSet tasks = preparedFindTasks.executeQuery();
+      while (tasks.next()) {
+        String taskID = tasks.getString("taskid");
+        String taskTitle = tasks.getString("tasktitle");
+        String categoryID = tasks.getString("taskcategoryid");
+        String category;
+        if(!(categoryID == null))
+        {
+          category = findCategoryTitle(tasks.getString("taskcategoryid"));
+        }
+        else
+        {
+          categoryID = "null";
+          category = "uncategorized";
+        }
+        String deadline = tasks.getString("deadline");
+        String priority = tasks.getString("priority");
+        returnTasks.add(formatData(taskID, taskTitle, category, categoryID, deadline));
+      }
+    }
+    catch(SQLException e)
+    {
+      throw new RuntimeException();
+    }
+    return returnTasks;
+  }
+
+  /**
+   * finds title of category given ID, mainly used to get text
+   * to remove from dropdown
+   * @param categoryID ID of category
+   * @return title of category
+   */
+  public String findCategoryTitle(String categoryID)
+  {
+    String returnTitle;
+    String findTitle = "select * from category where categoryid = ?";
+    try
+    {
+      PreparedStatement preparedFindTitle = dbConnection.prepareStatement(findTitle);
+      preparedFindTitle.setString(1, categoryID);
+      ResultSet category = preparedFindTitle.executeQuery();
+      category.next();
+      returnTitle = category.getString("categorytitle");
+    }
+    catch(SQLException e)
+    {
+      throw new RuntimeException();
+    }
+    return returnTitle;
+  }
+
+  /**
+   * formats the data that will be added to text area
+   * @param taskID ID of task
+   * @param taskTitle title of task
+   * @param categoryTitle category of task (if exists)
+   * @param categoryID ID of category (if exists)
+   * @param deadline deadline of task
+   * @return formatted String
+   */
+  public String formatData(String taskID, String taskTitle, String categoryTitle, String categoryID, String deadline)
+  {
+    while(taskTitle.length() < 20)
+    {
+      taskTitle = taskTitle + " ";
+    }
+    while(categoryTitle.length() < 20)
+    {
+      categoryTitle = categoryTitle + " ";
+    }
+    while(categoryID.length() < 10)
+    {
+      categoryID = categoryID + " ";
+    }
+    while(deadline.length() < 8)
+    {
+      deadline = deadline + " ";
+    }
+    return "TaskID: " + taskID + "| " + taskTitle + "| " + categoryTitle + "CategoryID: " + categoryID + "| " + "Due: " + deadline;
+  }
+
+  /**
+   * lists all categories for current user
+   * @param userID ID of current user
+   * @return list of categories
+   */
+  public ArrayList<String> findCategoriesForUser(String userID)
+  {
+    ArrayList<String> categoryTitles = new ArrayList<>();
+    String findCats = "select * from category where madebyuserid = ?";
+    try
+    {
+      PreparedStatement preparedFindCats = dbConnection.prepareStatement(findCats);
+      preparedFindCats.setString(1, userID);
+      ResultSet cats = preparedFindCats.executeQuery();
+      while (cats.next()) {
+        categoryTitles.add(cats.getString("categorytitle"));
+      }
+    }
+    catch(SQLException e)
+    {
+      throw new RuntimeException();
+    }
+    return categoryTitles;
   }
 
 }

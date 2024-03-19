@@ -111,7 +111,7 @@ public class Tests {
   {
     testApp.begin();
     assertTrue(testApp.checkLogIn("test@example.com", "examplepass"));
-    assertTrue(testApp.addTask("ExampleTask", "Brief Description", "03/31", 1, "pending"));
+    assertTrue(testApp.addTask("ExampleTask", "Brief Description", "03/31", 1));
     testApp.end();
   }
 
@@ -125,9 +125,9 @@ public class Tests {
   {
     testApp.begin();
     assertTrue(testApp.checkLogIn("test@example.com", "examplepass"));
-    assertTrue(testApp.addTask("title", "desc", "3/31", 0, "completed"));
-    assertTrue(testApp.addTask("othertitle", "desc", "11/1", 1, "pending"));
-    assertTrue(testApp.addTask("finaltitle", "desc", "1/1", 0, "completed"));
+    assertTrue(testApp.addTask("title", "desc", "3/31", 0));
+    assertTrue(testApp.addTask("othertitle", "desc", "11/1", 1));
+    assertTrue(testApp.addTask("finaltitle", "desc", "1/1", 0));
     testApp.end();
   }
 
@@ -140,11 +140,11 @@ public class Tests {
   {
     testApp.begin();
     assertTrue(testApp.checkLogIn("test@example.com", "examplepass"));
-    assertFalse(testApp.addTask("badexample", "baddesc", "0/15", 1, "pending"));
-    assertFalse(testApp.addTask("badexample2", "baddesc", "6/0", 0, "completed"));
-    assertFalse(testApp.addTask("badexample3", "baddesc", "146/1", 1, "pending"));
-    assertFalse(testApp.addTask("badexample4", "baddesc", "1/56", 0, "completed"));
-    assertFalse(testApp.addTask("badexample5", "baddesc", "4/589", 1, "completed"));
+    assertFalse(testApp.addTask("badexample", "baddesc", "0/15", 1));
+    assertFalse(testApp.addTask("badexample2", "baddesc", "6/0", 0));
+    assertFalse(testApp.addTask("badexample3", "baddesc", "146/1", 1));
+    assertFalse(testApp.addTask("badexample4", "baddesc", "1/56", 0));
+    assertFalse(testApp.addTask("badexample5", "baddesc", "4/589", 1));
     testApp.end();
   }
 
@@ -157,10 +157,9 @@ public class Tests {
   {
     testApp.begin();
     assertTrue(testApp.checkLogIn("test@example.com", "examplepass"));
-    assertFalse(testApp.addTask("ThisTaskTitleIsTooLong", "This Is Fine", "02/29", 0, "completed"));
-    assertFalse(testApp.addTask("TitleGood", "This Is Fine", "2/30", 0, "completed"));
-    assertFalse(testApp.addTask("TitleGood", "This Is Fine", "02/29", 2, "completed"));
-    assertFalse(testApp.addTask("TitleGood", "This Is Fine", "02/29", 0, "invalidtype"));
+    assertFalse(testApp.addTask("ThisTaskTitleIsTooLong", "This Is Fine", "02/29", 0));
+    assertFalse(testApp.addTask("TitleGood", "This Is Fine", "2/30", 0));
+    assertFalse(testApp.addTask("TitleGood", "This Is Fine", "02/29", 2));
     testApp.end();
   }
 
@@ -227,9 +226,9 @@ public class Tests {
     testApp.begin();
     assertTrue(testApp.checkLogIn("test@example.com", "examplepass"));
     assertTrue(testApp.addCategory("Display"));
-    assertTrue(testApp.addTask("Task1", "I do things", "2/17", 1, "completed"));
-    assertTrue(testApp.addTask("Task2", "I do things", "2/17", 1, "completed"));
-    assertTrue(testApp.addTask("Task3", "I do things", "2/17", 1, "completed"));
+    assertTrue(testApp.addTask("Task1", "I do things", "2/17", 1));
+    assertTrue(testApp.addTask("Task2", "I do things", "2/17", 1));
+    assertTrue(testApp.addTask("Task3", "I do things", "2/17", 1));
     assertTrue(testApp.addTaskToCategory("Display", "Task1"));
     assertTrue(testApp.addTaskToCategory("Display", "Task2"));
     assertTrue(testApp.addTaskToCategory("Display", "Task3"));
