@@ -6,9 +6,10 @@
 
  ## Updates will be kept track of within this README
  3/8/24 Functionality of application level mostly finished aside from a couple other features I would like to add. GUI still needs implemented
+ 3/19/24 Implemented GUI and connected to Application layer. App is fully functional.
 
 ## Features Roadmap
-- Add uniqueness to names of tasks and categories
-- Implement GUI
+- ~~Implement GUI~~
 - Make any necessary changes of app level following implementation of the GUI
-- Add email function for high priority tasks
+- ~~Add email function for high priority tasks~~
+- Add verification of emails upon creating account
